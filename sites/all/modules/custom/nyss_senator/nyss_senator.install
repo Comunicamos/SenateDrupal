@@ -1,0 +1,12 @@
+<?php
+
+/**
+* Hook sets nyss_senator 'weight' to -1.
+* This ensures that it's hook_form_alter runs before cck.
+*
+*/
+function nyss_senator_install() {
+  $ret = array();
+  $ret[] = db_query("UPDATE {system} SET weight = -1 WHERE name = 'nyss_senator'");
+  return $ret;
+}

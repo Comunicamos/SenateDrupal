@@ -1,0 +1,6 @@
+; $Id:$
+name = NYSS Senator
+description = Determine what Senator this page content belongs to.
+package = NYSS
+core = 6.x
+dependencies[] = pathauto

@@ -1,0 +1,28 @@
+D/date////
+D/date_copy////
+D/date_php4////
+D/date_popup////
+D/date_repeat////
+D/date_timezone////
+D/help////
+D/images////
+D/includes////
+D/tests////
+D/theme////
+D/date_locale////
+D/date_tools////
+D/translations////
+/CHANGELOG.txt/1.1.8.395/Mon Apr 27 18:31:14 2009//TDRUPAL-6--2-1
+/INSTALL.txt/1.10/Wed Feb 11 20:04:48 2009//TDRUPAL-6--2-1
+/README.txt/1.5.6.3/Mon Apr 27 18:31:14 2009//TDRUPAL-6--2-1
+/date-rtl.css/1.1.2.1/Sat Jan 10 23:05:40 2009//TDRUPAL-6--2-1
+/date.css/1.20.4.17/Tue Mar 24 17:28:46 2009//TDRUPAL-6--2-1
+/date_api.admin.inc/1.1.2.2/Mon Apr 27 18:31:14 2009//TDRUPAL-6--2-1
+/date_api.info/1.6/Wed Feb 11 20:04:48 2009//TDRUPAL-6--2-1
+/date_api.install/1.16.2.1.2.19/Mon Apr 27 18:31:14 2009//TDRUPAL-6--2-1
+/date_api.js/1.1.2.1/Sun Jan 25 13:03:13 2009//TDRUPAL-6--2-1
+/date_api.module/1.64.2.5.2.78/Mon Apr 27 18:31:14 2009//TDRUPAL-6--2-1
+/date_api_elements.inc/1.49.2.1.2.47/Mon Apr 27 18:31:14 2009//TDRUPAL-6--2-1
+/date_api_formats_list.inc/1.1.2.1/Sun Jan 25 13:03:13 2009//TDRUPAL-6--2-1
+/date_api_ical.inc/1.35.4.26/Tue Mar 24 17:28:46 2009//TDRUPAL-6--2-1
+/date_api_sql.inc/1.9.2.3.2.35/Tue Mar 24 17:28:46 2009//TDRUPAL-6--2-1

@@ -1,0 +1,4 @@
+; $Id: flag.info,v 1.2 2008/06/10 01:35:09 quicksketch Exp $
+name = Flag
+description = Create customized flags that users can set on nodes.
+core = 6.x

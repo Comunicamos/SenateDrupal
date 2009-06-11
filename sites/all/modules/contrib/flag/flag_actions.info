@@ -1,0 +1,5 @@
+; $Id: flag_actions.info,v 1.1.2.1 2008/09/05 17:38:06 quicksketch Exp $
+name = Flag actions
+description = Execute actions on Flag events.
+core = 6.x
+dependencies[] = flag

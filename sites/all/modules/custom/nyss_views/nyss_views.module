@@ -1,0 +1,162 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  NYSS Views
+ *
+ *  This module defines default custom views.
+ */
+
+/**
+* Valid permissions for this module
+* @return array An array of valid permissions for the custom views module
+*/
+function nyss_views_perm() {
+  return array('view all requests to promote content');
+}
+
+/**
+ *  Implements hook_views_query_alter().
+ */
+function nyss_views_views_query_alter(&$view, &$query) {
+  global $user;
+  // Because of the node access grants for office editors,
+  // we need to have distinct queries for them.
+  if (in_array('Office Editor', $user->roles) || in_array('Web Editor', $user->roles) || in_array('admin', $user->roles)) {
+    $query->distinct = TRUE;
+  }
+  if ($view->name == 'blog_main') {
+    // This alters the main blog view query, for /blog.
+    // We do this because there's (currently) no way to test for NULL with node references in Views 2.
+    $query->where[0]['clauses'][2] = "node_data_field_senator.field_senator_nid IS NULL";
+    unset($query->where[0]['args'][1]);
+  }
+  else if ($view->name == 'events_calendar') {
+    $senator = nyss_senator();
+    if ($senator->field_sessioncal[0]['value'] == 0) {
+      $query->where[0]['clauses'][2] .= ' OR node_node_data_field_senator.title IS NULL';
+      $query->where[0]['clauses'][] = 'node_data_field_date.field_public_hearing_value = \'2\' OR node_data_field_date.field_public_hearing_value IS NULL'; 
+    }
+  }
+  else if ($view->name == 'gallery' && $view->current_display == 'page_2') {
+    // This alters a senator's gallery view query, for /senator/[name]/gallery.
+    // Add a test for field-feature-image not null.
+    $query->where[0]['clauses'][] = "node_data_field_feature_image.field_feature_image_list IS NOT NULL";
+  }
+  else if ($view->name == 'committee_updates' && $view->current_display == 'page_2') {
+    // This alters a 'committees update' view query, for /committees/updates.
+    // Add a test for field_committee_nid not null.
+    $query->where[0]['clauses'][2] = "node_data_field_committee.field_committee_nid IS NOT NULL";
+  }
+  else if ($view->name == 'content_pages') {
+    // Ensure that main senate content pages & blocks filter by whether they don't reference a senator,
+    // OR if they've been promoted to the front.
+    $query->where[] = array(
+      'clauses' => array(
+        "node_data_field_senator.field_senator_nid IS NULL",
+        "flag_content_node.uid IS NOT NULL",
+      ),
+      'args' => array(),
+      'type' => 'OR',
+    );
+  }
+  else if ($view->name == 'flag_feature_on_front_carousel' || $view->name == 'senator_carousel') {
+    // Remove items that don't have a featured image from the front carousel.
+    $query->where[0]['clauses'][] = "node_data_field_feature_image.field_feature_image_list IS NOT NULL";
+  }
+  else if ($view->name == 'admin_flags_gallery_request' && $view->current_display == 'page_3') {
+    // Remove items that don't have a featured image from consideration for the front carousel.
+    $query->where[0]['clauses'][] = "node_data_field_feature_image.field_feature_image_list IS NOT NULL";
+  }
+  else if (($view->name == 'flag_request_to_gallery') || ($view->name == 'flag_request_video_to_gallery')) {
+	 if(user_access('view all requests to promote content') == false) {
+      global $user;
+      $query->where[0]['args'][0] = $user->uid;
+	 }
+	 else {
+	   unset($query->where[0]['clauses'][1]);
+	 }
+  }
+  // I Really Really do not like this work around but, the only thing I can think of to solve this problem if you have a better suggestion
+  // please let Advomatic(Jonathan) know. Thanks.
+  else if ($view->name == 'blog_search') {
+    // If the filter is empty then unset the requirement for content to have a term associated.
+    if (empty($view->exposed_input)) {
+      unset($query->where[0]['clauses'][2]);
+    }
+
+    // If Issue filter is <Any> then unset the requirement for content to have a term associated.
+    if ($view->exposed_input['tid'] == 'All' ) {
+      // If the By Senator filter gets set then the where clauses change order so unset appropriately.
+      if ($view->exposed_input['field_senator_nid'] == 'All') {
+        unset($query->where[0]['clauses'][2]);
+      }
+      else {
+        unset($query->where[0]['clauses'][3]);
+      }
+    }
+
+    // If the date is not set then remove it from the where clause.
+    if ($view->exposed_input['date_filter']['min']['date'] == 0) {
+      unset($query->where['date']);
+    }
+  }
+}
+
+/**
+ *  Implements hook_views_default_views().
+ */
+function nyss_views_views_default_views() {
+  $views = array();
+  $path = drupal_get_path('module', 'nyss_views') . '/views';
+  $files = drupal_system_listing('.inc$', $path, 'name', 0);
+  foreach($files as $file) {
+    include_once $file->filename;
+  }
+  return $views;
+}
+
+/**
+ *  Implements hook_views_pre_render().
+ */
+function nyss_views_views_pre_render(&$view) {
+  // Change %1 format based on if name has s at end or not.
+  // Foos' bar instead of Foos's bar
+  if (substr($view->argument['title']->argument_validated, -1) == 's') {
+    $view->argument['title']->options['title'] = str_replace("%1's", "%1'", $view->argument['title']->options['title']);
+
+    // I do not like the idea of doing this with drupal_set_title but I cannot think of another way to accomplish this.
+    // I tried changing out the options title in several different hooks of the views api with no luck and have spend an hour on this simple issue
+    // if anyone can think of a better way to do it then please do and let me know for future reference.
+    drupal_set_title(str_replace('%1', $view->argument['title']->argument_validated, $view->argument['title']->options['title']));
+  }
+}
+
+/**
+ *  Implements hook_nodeapi().
+ */
+function nyss_views_nodeapi(&$node, $op, $arg = 0) {
+  switch ($op) {
+    case 'rss item':
+      if ($node->type == 'event') {
+        $s = $node->field_date[0]['value'];
+        $start = mktime(substr($s, 11, 2), substr($s, 14, 2), substr($s, 17, 2), substr($s, 8, 2), substr($s, 5, 2), substr($s, 0, 4));
+        $e = $node->field_date[0]['value2'];
+        $end = mktime(substr($s, 11, 2), substr($s, 14, 2), substr($s, 17, 2), substr($s, 8, 2), substr($s, 5, 2), substr($s, 0, 4));
+
+        if ($start == $end) {
+          $date_string = format_date($start);
+        }
+        else {
+          $date_string = 'Start: ' . format_date($start) . '<br/>End: ' . format_date($end);
+        }
+
+        $description = $date_string . '<br/><br/>' . $node->field_location[0]['view']  . ($node->body['#value'] ? '<br/><br/>' . $node->body['#value'] : '');
+
+        $node = NULL;
+        return array(array('key' => 'description', 'value' => $description));
+      }
+      break;
+  }
+}

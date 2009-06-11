@@ -1,0 +1,435 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  NYSS Contact
+ *
+ *  Custom contact forms for senators.
+ */
+
+/**
+ *  Implements hook_menu().
+ */
+function nyss_contact_menu() {
+  $items = array();
+  $items['senator/%/contact_form'] = array(
+    'title' => 'Senator Contact',
+    'page callback' => 'nyss_contact_senator_page',
+    'page arguments' => array(1),
+    'access arguments' => array('access site-wide contact form'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['contact_form'] = array(
+    'title' => 'Contact the NY Senate',
+    'page callback' => 'nyss_contact_site_page',
+    'access arguments' => array('access site-wide contact form'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+
+/**
+ * Senator contact page.
+ */
+function nyss_contact_senator_page($account) {
+  global $user;
+  
+  if (!$account) {
+    drupal_set_message('Error loading senator.');
+    return;
+  }
+  
+  else if (!flood_is_allowed('contact', variable_get('contact_hourly_threshold', 3))) {
+    $output = t('You cannot contact more than %number users per hour. Please try again later.', array('%number' => variable_get('contact_hourly_threshold', 3)));
+  }
+  else {
+    if (!is_object($account)) { 
+      $account = nyss_senator();
+    }
+    
+    drupal_set_title(check_plain('Contact ' . $account->title));
+    $output = drupal_get_form('nyss_contact_mail_senator', $account);
+  }
+
+  return $output;
+}
+
+function nyss_contact_mail_senator(&$form_state, $recipient, $extra_info = '') {
+  global $user;
+  
+  if (!is_object($recipient)) { 
+    $recipient = nyss_senator();
+  }
+  
+  $form['#token'] = $user->name . $user->mail;
+  $form['recipient'] = array('#type' => 'value', '#value' => $recipient);
+  $form['guest_address'] = array('#type' => 'hidden', '#value' => $recipient->guest_address);
+  $form['to'] = array('#type' => 'item',
+    '#title' => t('To Senator'),
+    '#value' => l($recipient->title, 'node/'.$recipient->nid),
+  );
+  if ($user->uid) {
+    $form['from'] = array('#type' => 'item',
+      '#title' => t('From'),
+      '#value' => theme('username', $user) .' &lt;'. check_plain($user->mail) .'&gt;',
+    );
+  }
+  else {
+    $form['from_name'] = array('#type' => 'textfield',
+      '#title' => t('Your Name'),
+      '#size' => 33,
+      '#maxlength' => 50,
+    );    
+    $form['from_email'] = array('#type' => 'textfield',
+      '#title' => t('Your Email Address'),
+      '#size' => 33,
+      '#maxlength' => 50,
+      '#required' => TRUE,
+    );
+  }
+  $form['subject'] = array('#type' => 'textfield',
+    '#title' => t('Subject'),
+    '#size' => 33,
+    '#maxlength' => 50,
+    '#required' => TRUE,
+  );
+  $form['message'] = array('#type' => 'textarea',
+    '#title' => t('Message'),
+    '#rows' => 15,
+    '#required' => TRUE,
+  );
+  // We do not allow anonymous users to send themselves a copy
+  // because it can be abused to spam people.
+  if ($user->uid) {
+    $form['copy'] = array('#type' => 'checkbox',
+      '#title' => t('Send yourself a copy.'),
+    );
+  }
+  $form['submit'] = array('#type' => 'submit',
+    '#value' => t('Send e-mail'),
+  );
+  return $form;
+}
+/**
+ * Validate the senator contact page form submission.
+ */
+function nyss_contact_mail_senator_validate($form, &$form_state) {
+  if ($form_state['values']['from_email'] != '') {
+    if (!valid_email_address($form_state['values']['from_email'])) {
+      form_set_error('mail', t('You must enter a valid e-mail address.'));
+    }
+  }
+}
+/**
+ * Process the senator contact page form submission.
+ */
+function nyss_contact_mail_senator_submit($form, &$form_state) {
+  global $user, $language;
+
+  $account = $form_state['values']['recipient'];
+
+  // Send from the current user to the requested user.
+  $to = $account->field_email[0]['email'];
+  if (!$form_state['values']['from']) {
+    if ($form_state['values']['from_email'] != '') {
+      $from = $form_state['values']['from_email'];
+    }
+    if ($form_state['values']['from_name'] != '') {
+      $user->name = $form_state['values']['from_name'];
+    }
+    else {
+      $user->name = 'An Anonymous User';
+    }
+    $user->uid = 0;
+  }
+  else {
+    $from = $user->mail;
+  }
+
+  // Save both users and all form values for email composition.
+  $values = $form_state['values'];
+  $values['account'] = $account;
+  $values['user'] = $user;
+
+
+  // Send the e-mail in the requested user language.
+  drupal_mail('nyss_contact', 'senator_mail', $to, user_preferred_language($account), $values, $from);
+
+  // Send a copy if requested, using current page language.
+  if ($form_state['values']['copy']) {
+    drupal_mail('nyss_contact', 'senator_copy', $from, $language, $values, $from);
+  }
+
+  flood_register_event('contact');
+  watchdog('mail', '%name-from sent %name-to an e-mail.', array('%name-from' => $user->name, '%name-to' => $account->title));
+  drupal_set_message(t('The message has been sent.'));
+
+  // Back to the requested users profile page.
+  $form_state['redirect'] = "node/$account->nid";
+}
+
+
+
+/**
+ * Site-wide contact page.
+ */
+function nyss_contact_site_page() {
+  global $user;
+
+  if (!flood_is_allowed('contact', variable_get('contact_hourly_threshold', 3))) {
+    $output = t("You cannot send more than %number messages per hour. Please try again later.", array('%number' => variable_get('contact_hourly_threshold', 3)));
+  }
+  else {
+    $output = drupal_get_form('nyss_contact_mail_page');
+  }
+
+  return $output;
+}
+
+function nyss_contact_mail_page() {
+  global $user;
+
+  $form = $categories = array();
+
+  $result = db_query('SELECT cid, category, selected FROM {contact} ORDER BY weight, category');
+  while ($category = db_fetch_object($result)) {
+    $categories[$category->cid] = $category->category;
+    if ($category->selected) {
+      $default_category = $category->cid;
+    }
+  }
+
+  if (count($categories) > 0) {
+    $form['#token'] = $user->uid ? $user->name . $user->mail : '';
+    //$form['contact_information'] = array('#value' => filter_xss_admin(variable_get('contact_form_information', t('You can leave a message using the contact form below.'))));
+    $form['name'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Your name'),
+      '#maxlength' => 255,
+      '#default_value' => $user->uid ? $user->name : '',
+      '#required' => TRUE,
+    );
+    $form['mail'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Your e-mail address'),
+      '#maxlength' => 255,
+      '#default_value' => $user->uid ? $user->mail : '',
+      '#required' => TRUE,
+    );
+    $form['guest_address'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Your street address'),
+      '#size' => 15,
+      '#required' => TRUE,
+    );
+    $form['zip'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Your zip code'),
+      '#size' => 15,
+      '#required' => TRUE,
+    );
+    if (count($categories) > 1) {
+      $sen_cat = t('Contact my Senator');
+      $categories = array($sen_cat) + $categories;
+      
+      $form['cid'] = array('#type' => 'radios',
+        '#title' => t('Describe the nature of your message'),
+        '#default_value' => $default_category,
+        '#options' => $categories,
+        '#required' => TRUE,
+      );
+    }
+    else {
+      // If there is only one category, store its cid.
+      $category_keys = array_keys($categories);
+      $form['cid'] = array('#type' => 'value',
+        '#value' => array_shift($category_keys),
+      );
+    }
+    $form['subject'] = array('#type' => 'textfield',
+      '#title' => t('Subject'),
+      '#maxlength' => 255,
+      '#required' => TRUE,
+    );
+    $form['message'] = array('#type' => 'textarea',
+      '#title' => t('Message'),
+      '#required' => TRUE,
+    );
+    // We do not allow anonymous users to send themselves a copy
+    // because it can be abused to spam people.
+    if ($user->uid) {
+      $form['copy'] = array('#type' => 'checkbox',
+        '#title' => t('Send yourself a copy.'),
+      );
+    }
+    else {
+      $form['copy'] = array('#type' => 'value', '#value' => FALSE);
+    }
+    $form['submit'] = array('#type' => 'submit',
+      '#value' => t('Contact the Senate'),
+    );
+  }
+  else {
+    drupal_set_message(t('The contact form has not been configured. <a href="@add">Add one or more categories</a> to the form.', array('@add' => url('admin/build/contact/add'))), 'error');
+  }
+  return $form;
+}
+
+/**
+ * Validate the site-wide contact page form submission.
+ */
+function nyss_contact_mail_page_validate($form, &$form_state) {
+  if (!valid_email_address($form_state['values']['mail'])) {
+    form_set_error('mail', t('You must enter a valid e-mail address.'));
+  }
+  if ($form_state['values']['cid'] == 0) {
+    global $language;
+    $xml = nyss_contact_cd_lookup($form_state['values']['guest_address'].', '.$form_state['values']['zip']);
+
+    if ($xml) {
+      foreach($xml->districts->children() as $district) {
+        switch($district->attributes()->type) {
+          case 'congress':
+            $cd = $district;
+            break;
+          case 'assembly_upper':
+            $cd_upper = $district;
+            break;
+          case 'assembly_lower':
+            $cd_lower = $district;
+            break;
+        }
+      }
+    }
+
+    $items = array('Federal Congress: '. $cd, 'NYS Senate: '. $cd_upper, 'NYS Assembly: '. $cd_lower);
+    if ($cd) {
+      $senator_nid = db_result(db_query(db_rewrite_sql("SELECT s.nid FROM {content_type_senator} s JOIN {content_type_district} d ON s.field_senators_district_nid = d.nid JOIN {node} n ON s.vid = n.vid WHERE n.status = 1 AND d.field_district_number_value = %d"), $cd_upper));
+      $form_state['values']['account'] = node_load($senator_nid);
+    }
+    else {
+      form_set_error('address', t('You have not entered a valid New York state zip code or address.'));
+    }
+  }
+}
+
+/**
+ * Process the site-wide contact page form submission.
+ */
+function nyss_contact_mail_page_submit($form, &$form_state) {
+  global $user;
+  $values = $form_state['values'];
+  
+  // E-mail address of the sender: as the form field is a text field,
+  // all instances of \r and \n have been automatically stripped from it.
+  $from = $values['mail'];
+  
+  if ($values['account'] != '' && $values['cid'] == 0) {
+    // Send from the current user to the requested user.
+    $to = $form_state['values']['account']->field_email[0]['email'];
+    
+    $values = $form_state['values'];
+    $values['user'] = $user;
+
+    // Send the e-mail in the requested user language.
+    drupal_mail('nyss_contact', 'senator_mail', $to, user_preferred_language($values['account']), $values, $from);
+
+    // Send a copy if requested, using current page language.
+    if ($form_state['values']['copy']) {
+      drupal_mail('nyss_contact', 'senator_copy', $from, user_preferred_language($values['account']), $values, $from);
+    }
+    
+    // Send an auto-reply if necessary using the current language.
+    drupal_mail('nyss_contact', 'senator_autoreply', $from, user_preferred_language($values['account']), $values, $from);
+
+    flood_register_event('contact');
+    watchdog('mail', '%name-from sent %name-to an e-mail.', array('%name-from' => $user->name, '%name-to' => $values['account']->title));
+    drupal_set_message(t('You have successfully sent a message to Senator @name-to.', array('@name-to' => $values['account']->title)));
+  }
+  else {
+
+    // Load category properties and save form values for email composition.
+    $contact = contact_load($values['cid']);
+    $values['contact'] = $contact;
+
+    // Send the e-mail to the recipients using the site default language.
+    drupal_mail('nyss_contact', 'page_mail', $contact['recipients'], language_default(), $values, $from);
+
+    // If the user requests it, send a copy using the current language.
+    if ($values['copy']) {
+      drupal_mail('nyss_contact', 'page_copy', $from, $language, $values, $from);
+    }
+
+    // Send an auto-reply if necessary using the current language.
+    if ($contact['reply']) {
+      drupal_mail('nyss_contact', 'page_autoreply', $from, $language, $values, $contact['recipients']);
+    }
+    
+    flood_register_event('contact');
+    watchdog('mail', '%name-from sent an e-mail regarding %category.', array('%name-from' => $values['name'] ." [$from]", '%category' => $contact['category']));
+    drupal_set_message(t('Your message has been sent.'));
+  }
+
+  // Jump to home page rather than back to contact page to avoid
+  // contradictory messages if flood control has been activated.
+  $form_state['redirect'] = '';
+}
+
+
+/**
+ * Implementation of hook_mail().
+ */
+function nyss_contact_mail($key, &$message, $params) {
+  $language = $message['language'];
+  switch ($key) {
+    case 'page_mail':
+    case 'page_copy':
+      $contact = $params['contact'];
+      $message['subject'] .= t('[!category] !subject', array('!category' => $contact['category'], '!subject' => $params['subject']), $language->language);
+      $message['body'][] = t("!name sent a message using the contact form at !form.", array('!name' => $params['name'], '!form' => url($_GET['q'], array('absolute' => TRUE, 'language' => $language))), $language->language);
+      $message['body'][] = t('Address:', NULL, $language->language);
+      $message['body'][] = $params['guest_address'];
+      $message['body'][] = t('Message:', NULL, $language->language);
+      $message['body'][] = $params['message'];
+      break;
+    case 'page_autoreply':
+      $contact = $params['contact'];
+      $message['subject'] .= t('[!category] !subject', array('!category' => $contact['category'], '!subject' => $params['subject']), $language->language);
+      $message['body'][] = $contact['reply'];
+      break;
+    case 'senator_mail':
+    case 'senator_copy':
+      $user = $params['user'];
+      $account = $params['account'];
+      $message['subject'] .= '['. variable_get('site_name', 'Drupal') .'] '. $params['subject'];
+      $message['body'][] = "$account->title,";
+      $message['body'][] = t("!name (!name-url) has sent you a message via your contact form (!form-url) at !site.", array('!name' => $user->name, '!name-url' => url("user/$user->uid", array('absolute' => TRUE, 'language' => $language)), '!form-url' => url($_GET['q'], array('absolute' => TRUE, 'language' => $language)), '!site' => variable_get('site_name', 'Drupal')), $language->language);
+      $message['body'][] = t('Address:', NULL, $language->language);
+      $message['body'][] = $params['guest_address'];
+      $message['body'][] = t('Message:', NULL, $language->language);
+      $message['body'][] = $params['message'];
+      break;
+    case 'senator_autoreply':
+      $contact = $params['contact'];
+      $message['subject'] .= t('[NYS Senator Autoreply] !subject', array('!category' => $contact['category'], '!subject' => $params['subject']), $language->language);
+      $message['body'][] = t('Thank you for contacting your senator. Your email has been received and will be processed shortly.');
+      break;
+  }
+}
+
+function nyss_contact_cd_lookup($address) {
+  $url = "https://api.advomatic.com/polipoly/?address=". urlencode($address) ."&gmapapi=". variable_get('googlemap_api_key', '') ."&state=true";
+
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_HEADER, 0);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  $html = curl_exec($ch);
+  curl_close($ch);
+
+  if (strpos($html, '<state>NY</state>') !== FALSE) {
+    return simplexml_load_string($html);
+  }
+  return FALSE;
+}

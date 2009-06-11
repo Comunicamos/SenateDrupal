@@ -1,0 +1,242 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  NYSS Blocks
+ *
+ *  This module defines several custom blocks.
+ *
+ *  To add a new block, you'll need to do the following:
+ *    1) Add the block to the $deltas list in nys_blocks_block $op 'list',
+ *        keyed as $delta => $info_title.
+ *    2) Define when the block will appear, in nyss_blocks_display.
+ *    3) Create a theme file at themes/nyss_blocks.theme.block.[$delta].inc
+ *    4) Create two functions in that file: theme_nyss_blocks_view_subject_[$delta]
+ *        and theme_nyss_blocks_view_content_[$delta].
+ *    5) Rebuild your theme to catch the new functions.
+ */
+
+/**
+ *  Implements hook_block().
+ */
+function nyss_blocks_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+     case 'list':
+      $deltas = array(
+        'happening_now' => t('Happening Now...'),
+        'senator_tabs' => t('Senator tabs'),
+        'most_popular' => t('Most Popular'),
+        'front_carousel' => t('Front Carousel'),
+        'issues' => t('Issues'),
+        'ustream_video' => t('Live Stream'),
+        'search_blogs' => t('Search All Blogs'),
+        'committee_chair' => t('Committee Chair'),
+        'committee_members' => t('Committee Members'),
+        'committee_issues' => t('Committee Issues'),
+        'committees' => t('Committees'),
+        'about_senator_blog' => t('About this blog'),
+        'nyss_senator_search' => t('Senator Page Senator Search'),
+        'global_nyss_senator_search' => t('Global Senator Search'),
+        'nyss_signup' => t('Signup'),
+        'social_buttons' => t('Social buttons'),
+        'my_committees' => t('My Committees'),
+        'senator_carousel' => t("Senator's Carousel"),
+        'legislation_bookblock' => t("Legislation Bookblock"),
+        'legislation_navigator' => t("Legislation Navigator"),
+        'bill_search' => t("Search by Bill Number"),
+        'live_session' => t("Watch Live Session"),
+      );
+      $blocks = array();
+      foreach ($deltas as $delta => $info) {
+        $blocks[$delta] = array(
+          'info' => $info,
+          'visibility' => 2,
+          'pages' => "<?php return nyss_blocks_display('$delta'); ?>",
+        );
+      }
+      return $blocks;
+    case 'configure':
+      if ($delta == 'social_buttons') {
+        require_once('themes/nyss_blocks.theme.block.social_buttons.inc');
+        return nyss_blocks_configure_form_social_buttons();
+      }
+      break;
+    case 'save':
+      if ($delta == 'social_buttons') {
+        require_once('themes/nyss_blocks.theme.block.social_buttons.inc');
+        nyss_blocks_configure_form_save_social_buttons($edit);
+      }
+      break;
+    case 'view':
+      return array(
+        'subject' => theme('nyss_blocks_view_subject_'. $delta),
+        'content' => theme('nyss_blocks_view_content_'. $delta),
+      );
+  }
+}
+
+/**
+ *  Determine whether to display a specific block on the page.
+ *
+ *  This function is called by the 'pages' section of each individual block.
+ *  This is defined in hook_block, and controlled by PHP visibility (2).
+ *
+ *  @param $delta
+ *    The block to display.
+ *  @return
+ *    TRUE or FALSE, depending on whether the block should be displayed on this page.
+ */
+function nyss_blocks_display($delta) {
+  switch ($delta) {
+    case 'user:1':
+    case 'devel:1':
+    case 'devel:2':
+    case 'nyss_signup':
+      $path = nyss_blocks_get_path();
+      if ((arg(0) == 'districts') && (arg(1) == 'map')) {
+        return FALSE;
+      }
+      if ($path == 'issues-legislation' && arg(1) == 'search') {
+        return FALSE;
+      }
+      if ($delta == 'nyss_signup' && arg(0) == 'nyss_signup') {
+        return FALSE;
+      }
+      return TRUE;
+    case 'global_nyss_senator_search':
+      $path = nyss_blocks_get_path();
+      if ((arg(0) == 'districts') && (arg(1) == 'map')) {
+        return FALSE;
+      }
+      if ($path == 'issues-legislation' && arg(1) == 'search') {
+        return FALSE;
+      }
+      $senator = nyss_senator();
+      return empty($senator);
+    case 'front_carousel':
+    case 'happening_now':
+      return drupal_is_front_page();
+    case 'most_popular':
+//      $senator = nyss_senator();
+//      return (drupal_is_front_page() || ($senator->nid == arg(1) && $senator->type == 'senator' && arg(2) != 'edit')); 
+      return (drupal_is_front_page()); 
+    case 'social_buttons':
+      if (drupal_is_front_page()) return TRUE;
+    case 'nyss_senator_search':
+      $senator = nyss_senator();
+      return (!empty($senator));
+    case 'senator_tabs':
+    case 'senator_carousel':
+    case 'senator_bottom':
+      $senator = nyss_senator();
+      return ($senator->nid == arg(1) && $senator->type == 'senator' && arg(2) != 'edit');
+    case 'from_my_committee':
+      $senator = nyss_senator();
+      return ($senator->nid == arg(1) && $senator->type == 'senator' && arg(2) != 'edit' && $senator->field_committee_updates[0]['value'] != 1);
+    case 'my_committees':
+      $senator = nyss_senator();
+      return ($senator->nid == arg(1) && $senator->type == 'senator' && arg(2) != 'edit' && $senator->field_hide_committees[0]['value'] != 1);
+    case 'issues':
+    case 'committees':
+      $path = nyss_blocks_get_path();
+      return ($path == 'issues-legislation' && (arg(1) != 'search'));
+    case 'ustream_video':
+      $path = nyss_blocks_get_path();
+      return (($path == 'issues-legislation' || $path == 'media_reports') && (arg(1) != 'search'));
+    case 'committee_updates':
+      $committee = nyss_senator_committee();
+      return ($committee->nid == arg(1) && $committee->type == 'committee' && arg(2) != 'edit');
+    case 'committee_chair':
+      $committee = nyss_senator_committee();
+      return ($committee != FALSE && $committee->field_chairs[0]['nid'] != '');
+    case 'committee_members':
+    case 'committee_issues':
+      $committee = nyss_senator_committee();
+      return ($committee != FALSE);
+    case 'search_blogs':
+      $arg0 = arg(0);
+      $arg1 = arg(1);
+      if ($arg0 == 'node' && ($nid = $arg1) && is_numeric($nid)) {
+        $node = node_load($nid);
+      }
+      return ($node->type == 'blog' || ($arg0 == 'senator' && arg(2) == 'blog'));
+    case 'about_senator_blog':
+      if (arg(0) == 'node' && ($nid = arg(1)) && is_numeric($nid)) {
+        $node = node_load($nid);
+        return in_array($node->type, array('senator'));
+      }
+      return (arg(0) == 'blog');
+
+    // The following 'views' blocks are not defined with this module,
+    // but for convenience are used to determine their display options.
+    case 'views_gallery_block_1':
+      $senator = nyss_senator();
+      return ($senator && arg(2) == 'gallery');
+    case 'live_session':
+      if (drupal_is_front_page()) {
+        $livesession = simplexml_load_file('http://63.118.56.3/lbdcinfo/senses.xml');
+        $livesession = $livesession->channel->item->status;
+        if($livesession == 'CONVENED') {
+          return true;
+        }
+      } else {
+        return false;
+      }
+    case 'views_senator_press_block_1':
+      $senator = nyss_senator();
+      return ($senator && (arg(2) == 'newsroom') );
+    case 'legislation_navigator':
+    case 'legislation_bookblock':
+      if (arg(0) == 'node' && ($nid = arg(1)) && is_numeric($nid)) {
+        $node = node_load($nid);
+      }
+      return ($node->type == 'outline');
+	case 'bill_search':
+	  $path = nyss_blocks_get_path();
+      return ($path == 'issues-legislation' && (arg(1) != 'search'));	
+  }
+  return FALSE;
+}
+
+/**
+ * Gets current path alias.
+ *
+ * @return string
+ */
+function nyss_blocks_get_path() {
+  static $path;
+  if (empty($path)) {
+    $path = drupal_get_path_alias($_GET['q']);
+  }
+  return $path;
+}
+
+/**
+ *  Implements hook_theme().
+ */
+function nyss_blocks_theme($existing, $type, $theme, $path) {
+  $items = array();
+  foreach (nyss_blocks_block('list') as $delta => $block) {
+    $items["nyss_blocks_view_subject_$delta"] = array(
+      'arguments' => array(),
+      'file' => "themes/nyss_blocks.theme.block.$delta.inc",
+    );
+    $items["nyss_blocks_view_content_$delta"] = array(
+      'arguments' => array(),
+      'file' => "themes/nyss_blocks.theme.block.$delta.inc",
+    );
+  }
+  return $items;
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function nyss_blocks_form_alter(&$form, $form_state, $form_id) {
+  // Remove the block title setting for the social buttons block.
+  if ($form['module']['#value'] == 'nyss_blocks' && $form['delta']['#value'] == 'social_buttons') {
+    $form['block_settings']['title'] = '';
+    $form['block_settings']['title']['#type'] = 'hidden';
+  }
+}

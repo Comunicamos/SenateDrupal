@@ -1,0 +1,76 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  NYSS Senator Search
+ *
+ *  Search for the senator representing an address using districting shapefiles.
+ */
+
+/**
+ *  Implement hook_menu().
+ */
+function nyss_senator_search_menu() {
+  $items = array();
+  $items['nyss_senator_search'] = array(
+    'title' => 'Senator search by address',
+    'page callback' => 'nyss_senator_search_search',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'file' => 'includes/nyss_senator_search.search.inc',
+  );
+  return $items;
+}
+
+/**
+ *  Implements hook_theme().
+ */
+function nyss_senator_search_theme($existing, $type, $theme, $path) {
+  $items = array();
+  $items["nyss_senator_search"] = array(
+      'arguments' => array(),
+      'file' => "themes/nyss_senator_search.theme.inc",
+  );
+  return $items;
+}
+
+/**
+ *  Defines the FormAPI array for senator search.
+ *
+ *  @return
+ *    FormAPI form array.
+ */
+function nyss_senator_search_form() {
+  $form['address'] = array(
+    '#type' => 'textfield',
+    '#default_value' => t('Your Street Address'),
+    '#size' => 15,
+    '#attributes' => array(
+      'onblur' => "if (this.value == '') {this.value = 'Your Street Address';}", 
+      'onfocus' => "if (this.value == 'Your Street Address') {this.value = '';}",
+    ),
+  );
+  $form['zip'] = array(
+    '#type' => 'textfield',
+    '#default_value' => t('Zip'),
+    '#size' => 15,
+    '#attributes' => array(
+      'onblur' => "if (this.value == '') {this.value = 'Zip';}", 
+      'onfocus' => "if (this.value == 'Zip') {this.value = '';}",
+    ),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+    '#attributes' => array('id' => "edit-submit-search"),
+  );
+  return $form;
+}
+
+/**
+ * Implementation of hook_submit().
+ */
+function nyss_senator_search_form_submit(&$form, &$form_state) {
+  $form_state['redirect'] = 'nyss_senator_search/'. ($form_state['values']['address'] != 'Address' ? $form_state['values']['address'] : '') .','. ($form_state['values']['zip'] != 'Zip' ? $form_state['values']['zip'] : '');
+}

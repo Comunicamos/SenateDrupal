@@ -1,0 +1,5 @@
+; $Id:$
+name = NYSS Blocks
+description = Custom blocks.
+package = NYSS
+core = 6.x

@@ -1,0 +1,34 @@
+/* $Id: printlinks.css,v 1.1.2.4 2009/03/27 01:12:35 jcnventura Exp $ */
+
+.print-link {
+  /* Use these for links above the content */
+  display: block;
+  text-align: right;
+  /* Use these for links in a corner of the content */
+  /*
+  position:relative;
+  bottom: 0.5em;
+  float:right;
+  */
+}
+
+.print_html, .print_mail, .print_pdf {
+  margin-left: 1em;
+}
+
+.print-syslink {
+  margin-right: 1em;
+}
+
+img.print-icon {
+  vertical-align: middle;
+}
+
+img.print-icon-margin {
+  padding-right: 4px;
+}
+
+label.printmail-label {
+  width: 175px;
+  float: left;
+}

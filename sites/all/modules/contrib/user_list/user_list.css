@@ -1,0 +1,26 @@
+/* $Id: user_list.css,v 1.2.2.1 2008/12/23 18:39:43 cyu Exp $ */
+
+.user_list_menu ul {
+  padding: 0; margin: 0;
+}
+
+.user_list_menu ul li {
+  list-style-type: none;
+  list-style-image: none;
+  float: left;
+}
+
+.user_list_menu ul:after {
+    content: ".";
+    display: block;
+    height: 0;
+    clear: both;
+    visibility: hidden;
+}
+
+.user_list_menu ul {display: inline-block;}
+
+/* Hides from IE-mac \*/
+* html .user_list_menu ul {height: 1%;}
+.user_list_menu ul {display: block;}
+/* End hide from IE-mac */

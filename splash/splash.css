@@ -1,0 +1,134 @@
+body {
+  background-image: url(background-repeat.png);
+  background-position: left top;
+  background-repeat: repeat-x;
+  padding: 0;
+  margin: 0;
+  font-family: Verdana, Arial, sans-serif;
+  font-size: 10px;
+  color: #666;
+}
+a {
+  color: #666;
+  text-decoration: none;
+}
+a:visited {
+  color: #666;
+}
+a img {
+  border: 0;
+}
+#main-splash {
+  background-image: url(background.png);
+  background-position: center top;
+  background-repeat: no-repeat;
+  width: 800px;
+  min-height: 693px;
+  margin: 0 auto;
+  text-align: center;
+  padding-top: 30px;
+}
+#info {
+  width: 600px;
+  margin: 40px auto;
+  background: url(bg-trans.png);
+  text-align: left;
+  padding: 20px;
+  border: 3px solid #999;
+  color: #333;
+}
+#seal {
+  position: relative;
+  top: 145px;
+}
+#blurb {
+  position: relative;
+  top: 170px;
+}
+#joinus {
+  position: relative;
+  top: 200px;
+  width: 400px;
+  margin: 0 auto;
+}
+#joinus a {
+  color: brown;  
+}
+#joinus dl {
+  text-align: left;
+  padding-left: 32px;
+}
+#joinus dt {
+  float: left;
+  width: 55px;
+}
+#joinus dd {
+  padding-left: 5px;
+}
+#signup {
+  position: relative;
+  top: 230px;
+  font-family: Verdana, Arial, sans-serif;
+  font-size: 10px;
+  width: 230px;
+  margin: 0 auto;
+}
+#signup table {
+  margin: 0 auto;
+  padding: 0;
+  width: 200px;
+}
+#signup tr, #signup td {
+  margin: 0;
+  padding: 0;
+}
+#signup label {
+  color: #666;
+  text-align: center;
+}
+#signup input {
+  text-align: center;
+  font-size: 10px;
+}
+#signup input#signup-email {
+  width: 100%;
+}
+#signup input#signup-sms {
+  width: 100%;
+  padding-right: 10px;
+}
+#signup #submit-td {
+  text-align: right;
+  padding-left: 10px;
+  *padding: 0;
+}
+#signup input#submit {
+  width: 25px;
+  height: 15px;
+  color: transparent;
+  *line-height: 1000px;
+  background-image: url(enter-button.png);
+  background-repeat: no-repeat;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  cursor: pointer;
+  *padding: 0;
+  text-align: right;
+}
+#twitter {
+  position: relative;
+  top: 265px;
+  line-height: 15px;
+  width: 205px;
+  margin: 0 auto;
+}
+#footer {
+  position: relative;
+  top: 320px;
+  color: #999;
+  padding-bottom: 20px;
+}
+#footer a {
+  color: #999;
+}

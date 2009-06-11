@@ -1,0 +1,447 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  NYSS Senator
+ *
+ *  This module determines whether a page belongs to a certain senator.
+ */
+
+/**
+ *  Implements hook_init().
+ */
+function nyss_senator_init() {
+  // Determine what Senator, if any, this page belongs to.
+  nyss_senator();
+}
+
+/**
+ *  Implements hook_menu().
+ */
+function nyss_senator_menu() {
+  $items = array();
+
+  $items['senator/%nyss_senator/legislation'] = array(
+    'title' => "Senator's legislation",
+    'page callback' => 'nyss_senator_legislation_page',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['senator/%nyss_senator/legislation/iframe'] = array(
+    'title' => "Senator's legislation",
+    'page callback' => 'nyss_senator_legislation_iframe_page',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['issues_legislation/search'] = array(
+    'title' => "Legislation Search",
+    'page callback' => 'nyss_senator_issues_legislation_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ *  Callback for /issues_legislation.
+ *
+ *  Displays an iFrame to the Legislation portal.
+ */
+function nyss_senator_issues_legislation_page() {
+  return nyss_senator_iframe("http://public.leginfo.state.ny.us/menuf.cgi");
+}
+
+/**
+ *  Create an IFrame.
+ *  @param $path
+ *    The URL of the IFrame.
+ *  @return
+ *    The HTML for the iFrame.
+ */
+function nyss_senator_iframe($path) {
+  return <<<IFRAME
+    <iframe src ="$path" width="100%" height="500px" frameborder="0" border="0" scrolling="no">
+      <p>Your browser does not support iframes.</p>
+    </iframe>
+IFRAME;
+}
+
+/**
+ *  Callback for senator/[title]/legislation.
+ *  Displays an iFrame for senator/[title]/legislation/iframe,
+ *  which is a portal to that senator's legislation.
+ *
+ *  @param $senator
+ *    The senator's node.
+ *  @return
+ *    The page output.
+ */
+function nyss_senator_legislation_page($senator) {
+  // Check if senator name has s @ the end if so just put "'".
+  if (substr($senator->title, -1) == 's') {
+    drupal_set_title(t("@senator' Legislation", array('@senator' => $senator->title)));
+  }
+  else {
+    drupal_set_title(t("@senator's Legislation", array('@senator' => $senator->title)));
+  }
+  $path = '/senator/'. nyss_senator_title_to_url($senator) .'/legislation/iframe';
+
+  $district = node_load($senator->field_senators_district[0]['nid']);
+  $district_number = $district->field_district_number[0]['value'];
+  $link = '<form name="newload" target="_blank" method="post" action="http://public.leginfo.state.ny.us/distsen.cgi"><input type=hidden name="referer" value="http://www.nyssenate' . $district_number .'.com"><a href="" class="ext" onClick="confirm(Drupal.settings.extlink.extAlertText); document.newload.submit();" >View this page in a new window<span class="ext"></span></a><noscript><input type="submit" value="View this page in a new window"></noscript></form>';
+
+  return '<div>' . $link . '</div>' . nyss_senator_iframe($path);
+}
+
+/**
+ *  The portal to a senator's legislation.
+ *
+ *  This will be displayed in an iframe, and simply redirects to the
+ *  legislation portal, keyed to that senator's district.
+ *
+ *  @param $senator
+ *    The senator's node.
+ *  @return
+ *    It exits upon printing the page output.
+ */
+function nyss_senator_legislation_iframe_page($senator) {
+  if (!$senator->field_senators_district[0]['nid']) {
+    return drupal_not_found();
+  }
+  $district = node_load($senator->field_senators_district[0]['nid']);
+  $district_number = $district->field_district_number[0]['value'];
+  print <<<IFRAME
+<Body onLoad="submit_load()">
+
+<Script language="javascript">
+
+  function submit_load()
+  {
+      document.load.submit();
+  }
+
+</script>
+
+<form name="load" method="post" action="http://public.leginfo.state.ny.us/distsen.cgi">
+
+  <input type=hidden name="referer" value="http://www.nyssenate$district_number.com">
+
+</form>
+</body>
+IFRAME;
+  exit();
+}
+
+/**
+ *  This is called when determining a menu argument from %nyss_senator.
+ *
+ *  @param $senator
+ *    The string in the URL.
+ *  @return
+ *    Either the corresponding senator's node, or FALSE.
+ */
+function nyss_senator_load($senator) {
+  return nyss_senator_node_from_title($senator);
+}
+
+/**
+ *  What senator does this page belong to?
+ *
+ *  If a page view or content belongs to a specific senator, this will return
+ *  the node for that senator, or FALSE if it doesn't belong to any senator.
+ *
+ *  @param $node
+ *    (optional) A node to see if it's related to a specific senator. If $node
+ *    is not provided, then it defaults to the senator associated with a page.
+ *
+ *  @return
+ *    The Senator's node, or FALSE.
+ */
+function nyss_senator($node = NULL) {
+  static $page_senator;
+
+  // Create the static cache for future reference.
+  if (is_null($node)) {
+    if (is_null($page_senator)) {
+      // Our default state.
+      $senator = FALSE;
+
+      if (arg(0) == 'node' && ($nid = arg(1)) && is_numeric($nid)) {
+        $node = node_load($nid);
+      }
+      else if (arg(0) == 'node' && (arg(1) == 'add') && ($nid = arg(3)) && is_numeric($nid)) {
+        $node = node_load($nid);
+      }
+      elseif (arg(0) == 'senator' && arg(1)) {
+        $node = nyss_senator_node_from_title(arg(1));
+      }
+      elseif (arg(0) == 'search' && arg(1) == 'nyss_search') {
+        $node = node_load($_SESSION['sen_nid']);
+      }
+
+      $page_senator = nyss_senator_node($node);
+    }
+    return $page_senator;
+  }
+
+  return nyss_senator_node($node);
+}
+
+/**
+ *  What committee does this page belong to?
+ *
+ *  If a page view or content belongs to a specific senator, this will return
+ *  the node for that senator, or FALSE if it doesn't belong to any senator.
+ *
+ *  @return
+ *    The Committees' node, or FALSE.
+ */
+function nyss_senator_committee() {
+  static $committee;
+
+  // Create the static cache for future reference.
+  if (is_null($committee)) {
+    // Our default state.
+    $committee = FALSE;
+
+    if (arg(0) == 'node' && ($nid = arg(1)) && is_numeric($nid)) {
+      $node = node_load($nid);
+    }
+    elseif (arg(0) == 'committee' && arg(1)) {
+      $node = nyss_senator_node_from_title(arg(1));
+    }
+
+    $committee = nyss_senator_committee_node($node);
+  }
+  return $committee;
+}
+
+/**
+ *  Retrives the senator node from a given title from a URL.
+ *  @param $title
+ *    The title from the URL.
+ *  @return
+ *    The corresponding senator node object.
+ */
+function nyss_senator_node_from_title($title) {
+  static $titles;
+
+  if (!isset($titles[$title]) || $reset) {
+    $titles[$title] = '';
+
+    // Try to find a path from $node->field_path[0] first.
+    $nid = db_result(db_query_range(db_rewrite_sql("SELECT n.nid FROM {node} n INNER JOIN {content_type_senator} s ON s.vid = n.vid AND s.field_path_value = '%s'"), $title, 0, 1));
+    if ($nid) {
+      $titles[$title] = node_load($nid);
+    }
+
+    // If we don't have a match from the field_path, then match for $node->title.
+    if (!$titles[$title]) {
+      $nid = db_result(db_query_range(db_rewrite_sql("SELECT n.nid FROM {node} n WHERE n.title = '%s'"), str_replace('_', ' ', $title), 0, 1));
+      if ($nid) {
+        $titles[$title] = $titles[$title] ? $titles[$title] : node_load($nid);
+      }
+    }
+  }
+
+  return $titles[$title];
+}
+
+/**
+ *  This will return the senator associated with the node.
+ *
+ *  @param $node
+ *    The node referencing the senator, or a senator's node.
+ *  @param $reset
+ *    (optional) If TRUE, then reset the static variable.
+ *  @return
+ *    The senator node referenced by the node.
+ */
+function nyss_senator_node($node, $reset = FALSE) {
+  static $senators;
+
+  // Reset our static array.
+  if (is_null($senators) || $reset) {
+    $senators = array();
+  }
+
+  // We cache the senators nodes.
+  if (is_null($senators[$node->nid])) {
+    $senators[$node->nid] = FALSE;
+
+    if ($node->type == 'senator') {
+      // If we're given a senator's node, then return it.
+      $senators[$node->nid] = $node;
+    }
+    else if ($node->type == 'district') {
+      // Reverse lookup for the senator referencing that district.
+      $nid = db_result(db_query_range(db_rewrite_sql("SELECT n.nid FROM {node} n INNER JOIN {content_type_senator} f ON f.field_senators_district_nid = %d AND f.vid = n.vid WHERE n.status = 1 ORDER BY n.created DESC"), $node->nid, 0, 1));
+      if ($nid) {
+        $senator = node_load($nid);
+        if ($senator->type == 'senator') {
+          // If the referenced node is a valid senator, then bingo.
+          $senators[$node->nid] = $senator;
+        }
+      }
+    }
+    else if ($node->field_senator[0]['nid']) {
+      // Check if the node references a senator.
+      $senator = node_load($node->field_senator[0]['nid']);
+      if ($senator->type == 'senator') {
+        // If the referenced node is a valid senator, then bingo.
+        $senators[$node->nid] = $senator;
+      }
+    }
+  }
+
+  return $senators[$node->nid];
+}
+
+/**
+ *  This will return the committee associated with the node.
+ *
+ *  @param $node
+ *    The node referencing the committee, or a committee's node.
+ *  @param $reset
+ *    (optional) If TRUE, then reset the static variable.
+ *  @return
+ *    The committee node referenced by the node.
+ */
+function nyss_senator_committee_node($node, $reset = FALSE) {
+  static $committees;
+
+  // Reset our static array.
+  if (is_null($committees) || $reset) {
+    $committees = array();
+  }
+
+  // We cache the committee nodes.
+  if (is_null($committees[$node->nid])) {
+    $committees[$node->nid] = FALSE;
+
+    if ($node->type == 'committee') {
+      // If we're given a committee's node, then return it.
+      $committees[$node->nid] = $node;
+    }
+    else if ($node->field_committee[0]['nid']) {
+      // Check if the node references a committee.
+      $committee = node_load($node->field_committee[0]['nid']);
+      if ($committee->type == 'comittee') {
+        // If the referenced node is a valid committee, then bingo.
+        $committees[$node->nid] = $committee;
+      }
+    }
+  }
+
+  return $committees[$node->nid];
+}
+
+/**
+ *  This will return the senator associated with the node.
+ *
+ *  @return Array
+ *    The committees that a senator is a part of.
+ */
+function nyss_senator_get_committees($reset = FALSE) {
+  static $committees;
+  if (!empty($committees) && !$reset) {
+    return $committees;
+  }
+
+  $senator = nyss_senator();
+  if ($senator) {
+    $committees = array();
+/*
+    // Get all committees associated with senator.
+    $results = db_query('SELECT DISTINCT(n.nid) FROM {node} n INNER JOIN {content_field_multi_senator} ms ON ms.nid = n.nid
+      INNER JOIN {content_field_chairs} fc ON fc.nid = n.nid
+      WHERE (ms.field_multi_senator_nid = %d OR fc.field_chairs_nid = %d) AND n.type = "committee" ORDER BY n.title', $senator->nid, $senator->nid);
+*/
+
+    $results = db_query('SELECT n.nid, n.title FROM {node} n INNER JOIN {content_field_multi_senator} ms ON ms.nid = n.nid
+      WHERE ms.field_multi_senator_nid = %d AND n.type = "committee" AND n.status = 1', $senator->nid);
+    while ($committee = db_fetch_object($results)) {
+      $committees[$committee->nid] = array('nid' => $committee->nid, 'title' => $committee->title, 'chair' => 0);
+    }
+
+    $results = db_query('SELECT n.nid, n.title FROM {node} n INNER JOIN {content_field_chairs} fc ON fc.nid = n.nid
+        WHERE fc.field_chairs_nid = %d AND n.type = "committee" AND n.status = 1', $senator->nid);
+    while ($committee = db_fetch_object($results)) {
+      $committees[$committee->nid] = array('nid' => $committee->nid, 'title' => $committee->title, 'chair' => 1);
+    }
+
+    // If the senator has any committees cool then return them.
+    uasort($committees, 'nyss_senator_sort_committees');
+    return $committees;
+  }
+  else {
+    // :( no committees were found booo!
+    return FALSE;
+  }
+}
+
+/**
+ *  Sort the committee array by committee title.
+ */
+function nyss_senator_sort_committees($a, $b) {
+  if ($a['title'] == $b['title']) {
+    return 0;
+  }
+  return ($a['title'] < $b['title']) ? -1 : 1;
+}
+
+/**
+ *  Format a senator's name for a URL.
+ *
+ *  Replaces all spaces with underscores.
+ *
+ *  @param $senator
+ *    The senator node.
+ *  @return
+ *    The transposed title.
+ */
+function nyss_senator_title_to_url($senator = NULL) {
+  if (is_null($senator)) {
+    $senator = nyss_senator();
+  }
+  if ($senator->title) {
+    _pathauto_include();
+    $name = ($senator->field_path[0]['value'] != '[senator]') ? $senator->field_path[0]['value'] : $senator->title;
+    return pathauto_cleanstring(strtolower($name));
+  }
+  return '';
+}
+
+/**
+ *  Implements hook_nodeapi().
+ */
+function nyss_senator_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  if ($node->type == 'senator') {
+    switch ($op) {
+      case 'insert':
+      case 'update':
+        // When submitting a senator's node, we need to set the field_path to default if needed.
+        // This has to happen before pathauto and CCK,
+
+        // Replace '' with [senator] first.
+        $node->field_path[0]['value'] = $node->field_path[0]['value'] ? $node->field_path[0]['value'] : '[senator]';
+
+        // Replace [senator] with the node title.
+        $node->field_path[0]['value'] = str_replace('[senator]', $node->title, $node->field_path[0]['value']);
+
+        // Replace spaces, etc. with the pathauto separator.
+        $node->field_path[0]['value'] = pathauto_cleanstring(strtolower($node->field_path[0]['value']));
+
+        // Next, we make a best guess for the Senator's last name (used for sorting).
+        if (!$node->field_last_name[0]['value']) {
+          preg_match('@(.+) ([^ ]+)$@i', $node->title, $matches);
+          $node->field_last_name[0]['value'] = $matches[2] .', '. $matches[1];
+        }
+        break;
+    }
+  }
+}
