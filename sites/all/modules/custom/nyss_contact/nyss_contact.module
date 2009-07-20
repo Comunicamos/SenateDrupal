@@ -420,6 +420,9 @@ function nyss_contact_mail($key, &$message, $params) {
 }
 
 function nyss_contact_cd_lookup($address) {
+  // THIS USES AN ADVOMATIC API WHICH MAY NOT ALWAYS BE AVAILABLE! BE FOREWARNED.
+  // FOR MORE INFORMATION, EMAIL info@advomatic.com
+  drupal_set_message('This feature uses an external API hosted by <a href="http://www.advomatic.com">Advomatic, LLC.</a> It may not always be available. Use it at your own discretion. To remove this warning, edit function nyss_contact_cd_lookup() in /sites/all/modules/custom/nyss_contact/nyss_contact.module');
   $url = "https://api.advomatic.com/polipoly/?address=". urlencode($address) ."&gmapapi=". variable_get('googlemap_api_key', '') ."&state=true";
 
   $ch = curl_init($url);
